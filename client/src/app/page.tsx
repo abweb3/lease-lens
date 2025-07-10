@@ -3,21 +3,40 @@
 import { useState } from 'react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
+import { useFeatureFlag } from '@/hooks/use-feature-flag';
+import { FileUpload } from '@/components/enhanced/file-upload';
+import { AppLayout } from '@/components/enhanced/layout';
+import { isPDFFile, isValidFileSize } from '@/lib/utils';
 
 export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  
+  // Feature flags
+  const isEnhancedNavigationEnabled = useFeatureFlag('enhanced-navigation');
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFile(e.target.files[0]);
+  const handleFileSelect = (selectedFile: File) => {
+    // Validate file type
+    if (!isPDFFile(selectedFile)) {
+      setError('Please select a PDF file.');
+      return;
     }
+
+    // Validate file size (10MB limit)
+    if (!isValidFileSize(selectedFile, 10)) {
+      setError('File size must be less than 10MB.');
+      return;
+    }
+
+    setFile(selectedFile);
+    setError('');
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleFileUpload = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!file) {
       setError('Please select a file to analyze.');
       return;
@@ -26,9 +45,18 @@ export default function HomePage() {
     setIsLoading(true);
     setError('');
     setAnalysis('');
+    setUploadProgress(0);
 
     const formData = new FormData();
     formData.append('file', file);
+
+    // Simulate upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 30;
+      });
+    }, 200);
 
     try {
       const response = await axios.post('http://127.0.0.1:8000/analyze', formData, {
@@ -36,69 +64,146 @@ export default function HomePage() {
           'Content-Type': 'multipart/form-data',
         },
       });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
       setAnalysis(response.data.analysis);
-    } catch (err: any) {
-      if (err.response) {
-        setError(`Error: ${err.response.data.detail || 'An unknown error occurred.'}`);
+
+      // Save analysis to localStorage for dashboard
+      if (file) {
+        const analysisEntry = {
+          id: Date.now().toString(),
+          fileName: file.name,
+          fileSize: file.size,
+          analyzedAt: new Date().toISOString(),
+          summary: response.data.analysis.substring(0, 200) + '...',
+          redFlags: (response.data.analysis.match(/🚩/g) || []).length,
+          analysis: response.data.analysis
+        };
+
+        const existingHistory = JSON.parse(localStorage.getItem('lease-lens-history') || '[]');
+        const updatedHistory = [analysisEntry, ...existingHistory].slice(0, 50); // Keep only last 50
+        localStorage.setItem('lease-lens-history', JSON.stringify(updatedHistory));
+      }
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      if (error.response) {
+        setError(error.response.data?.detail || 'An unknown error occurred.');
       } else {
-        setError('Could not connect to the analysis service. Is it running?');
+        setError('Could not connect to the analysis service. Please check if the backend server is running.');
       }
     } finally {
       setIsLoading(false);
+      setUploadProgress(0);
     }
   };
 
-  return (
-    <main className="flex min-h-screen flex-col items-center p-8 md:p-24 bg-gray-50">
-      <div className="w-full max-w-4xl">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-800">Lease Lens 🔎</h1>
-          <p className="mt-2 text-lg text-gray-600">Understand your lease before you sign.</p>
-        </header>
 
-        <div className="bg-white p-8 rounded-xl shadow-md border border-gray-200">
-          <form onSubmit={handleSubmit}>
-            <div className="mb-6">
-              <label htmlFor="file-upload" className="block text-lg font-medium text-gray-700 mb-2">Upload Lease Agreement (PDF)</label>
-              <input
-                id="file-upload"
-                type="file"
-                accept=".pdf"
-                onChange={handleFileChange}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              />
-            </div>
+  const content = (
+    <div className="w-full max-w-4xl mx-auto">
+      <header className="text-center mb-12">
+        <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">
+          Lease Lens 🔎
+        </h1>
+        <p className="text-xl text-gray-700 max-w-2xl mx-auto leading-relaxed">
+          Get AI-powered analysis of your lease agreement. Understand your rights, spot red flags, and negotiate with confidence.
+        </p>
+      </header>
+
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-8 py-6 border-b border-gray-100">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Upload Your Lease</h2>
+          <p className="text-gray-600">
+            Upload your PDF lease agreement to get instant AI analysis and insights.
+          </p>
+        </div>
+        
+        <div className="p-8">
+          <form onSubmit={handleFileUpload}>
+            <FileUpload
+              onFileSelect={handleFileSelect}
+              isUploading={isLoading}
+              uploadProgress={uploadProgress}
+              error={error}
+              accept=".pdf"
+              maxSize={10}
+              className="mb-8"
+            />
+            
             <button
               type="submit"
               disabled={isLoading || !file}
-              className="w-full text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-lg px-5 py-3 transition-all duration-150 ease-in-out disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 px-6 rounded-xl text-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed disabled:shadow-none"
             >
-              {isLoading ? 'Analyzing...' : 'Analyze My Lease'}
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Analyzing Your Lease...
+                </div>
+              ) : (
+                'Analyze My Lease'
+              )}
             </button>
           </form>
-          {error && <div className="mt-4 text-red-600 bg-red-100 p-3 rounded-lg">{error}</div>}
         </div>
+      </div>
 
-        {isLoading && (
-            <div className="mt-8 text-center">
-                <div role="status">
-                    <svg aria-hidden="true" className="inline w-10 h-10 text-gray-200 animate-spin fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
-                        <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0492C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
-                    </svg>
-                    <span className="sr-only">Loading...</span>
-                </div>
-                <p className="mt-4 text-gray-600">AI is reading your lease... this may take a moment.</p>
+      {isLoading && (
+        <div className="mt-8 bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+              <svg className="w-8 h-8 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
             </div>
-        )}
-
-        {analysis && (
-          <div className="mt-8 bg-white p-8 rounded-xl shadow-md border border-gray-200">
-              <article className="prose prose-lg max-w-none">
-                 <ReactMarkdown>{analysis}</ReactMarkdown>
-              </article>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Analyzing Your Lease</h3>
+            <p className="text-gray-600 mb-4">Our AI is carefully reviewing your lease agreement...</p>
+            <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            </div>
           </div>
-        )}
+        </div>
+      )}
+
+      {analysis && (
+        <div className="mt-8 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-8 py-6 border-b border-gray-100">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-4">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900">Analysis Complete</h2>
+                <p className="text-gray-600">Here&apos;s what our AI found in your lease agreement</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-8">
+            <article className="prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700">
+              <ReactMarkdown>{analysis}</ReactMarkdown>
+            </article>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (isEnhancedNavigationEnabled) {
+    return <AppLayout>{content}</AppLayout>;
+  }
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30">
+      <div className="container mx-auto px-4 py-12 md:py-20">
+        {content}
       </div>
     </main>
   );
