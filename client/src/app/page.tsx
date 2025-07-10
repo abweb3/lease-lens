@@ -68,6 +68,23 @@ export default function HomePage() {
       clearInterval(progressInterval);
       setUploadProgress(100);
       setAnalysis(response.data.analysis);
+
+      // Save analysis to localStorage for dashboard
+      if (file) {
+        const analysisEntry = {
+          id: Date.now().toString(),
+          fileName: file.name,
+          fileSize: file.size,
+          analyzedAt: new Date().toISOString(),
+          summary: response.data.analysis.substring(0, 200) + '...',
+          redFlags: (response.data.analysis.match(/🚩/g) || []).length,
+          analysis: response.data.analysis
+        };
+
+        const existingHistory = JSON.parse(localStorage.getItem('lease-lens-history') || '[]');
+        const updatedHistory = [analysisEntry, ...existingHistory].slice(0, 50); // Keep only last 50
+        localStorage.setItem('lease-lens-history', JSON.stringify(updatedHistory));
+      }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       if (error.response) {
