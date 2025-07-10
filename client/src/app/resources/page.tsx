@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
+import { cn } from '@/lib/utils';
 
 interface Resource {
   id: string;
@@ -17,27 +18,28 @@ interface Resource {
   content?: string;
 }
 
+// Phase 1: Expanded resource content
 const resources: Resource[] = [
   {
     id: '1',
     title: 'Tenant Rights Handbook',
-    description: 'Comprehensive guide to understanding your rights as a tenant',
+    description: 'Comprehensive guide to understanding your rights as a tenant, including lease terms, habitability standards, and legal protections.',
     category: 'rights',
     type: 'guide',
-    content: 'Your complete guide to tenant rights and responsibilities...'
+    content: 'Your complete guide to tenant rights and responsibilities including privacy rights, repair requests, and protection from retaliation.'
   },
   {
     id: '2',
     title: 'Security Deposit Guide',
-    description: 'Learn when and how to get your security deposit back',
+    description: 'Learn when and how to get your security deposit back, including documentation requirements and dispute resolution.',
     category: 'financial',
     type: 'guide',
-    content: 'Understanding security deposit laws and your rights...'
+    content: 'Understanding security deposit laws, proper documentation, and steps to take if your deposit is wrongfully withheld.'
   },
   {
     id: '3',
     title: 'Legal Aid Hotline',
-    description: 'Free legal advice for housing issues',
+    description: 'Free legal advice for housing issues, tenant rights violations, and landlord disputes.',
     category: 'legal',
     type: 'contact',
     phone: '1-800-LEGAL-AID'
@@ -45,7 +47,7 @@ const resources: Resource[] = [
   {
     id: '4',
     title: 'Rent Stabilization Board',
-    description: 'File complaints about rent increases and housing conditions',
+    description: 'File complaints about illegal rent increases, housing code violations, and habitability issues.',
     category: 'legal',
     type: 'external',
     link: 'https://www.example.gov/rent-board'
@@ -53,7 +55,7 @@ const resources: Resource[] = [
   {
     id: '5',
     title: 'Emergency Housing Assistance',
-    description: '24/7 help for housing emergencies and homelessness prevention',
+    description: '24/7 help for housing emergencies, homelessness prevention, and emergency rental assistance programs.',
     category: 'emergency',
     type: 'contact',
     phone: '211'
@@ -61,7 +63,7 @@ const resources: Resource[] = [
   {
     id: '6',
     title: 'Fair Housing Commission',
-    description: 'Report discrimination and learn about fair housing laws',
+    description: 'Report housing discrimination based on race, gender, disability, family status, and other protected characteristics.',
     category: 'rights',
     type: 'external',
     link: 'https://www.hud.gov/fairhousing'
@@ -69,35 +71,91 @@ const resources: Resource[] = [
   {
     id: '7',
     title: 'Lease Negotiation Tips',
-    description: 'Strategies for negotiating better lease terms',
+    description: 'Expert strategies for negotiating better lease terms, understanding clauses, and protecting your interests.',
     category: 'rights',
     type: 'guide',
-    content: 'Expert tips for negotiating with landlords...'
+    content: 'Professional tips for lease negotiations, red flag clauses to avoid, and how to propose favorable amendments.'
   },
   {
     id: '8',
     title: 'Eviction Prevention',
-    description: 'Know your rights and options if facing eviction',
+    description: 'Know your rights and legal options if facing eviction, including tenant defenses and assistance programs.',
     category: 'emergency',
     type: 'guide',
-    content: 'Understanding the eviction process and your defenses...'
+    content: 'Understanding the eviction process, your legal defenses, emergency assistance programs, and how to respond to notices.'
+  },
+  {
+    id: '9',
+    title: 'Rent Control Information',
+    description: 'Understanding rent control laws, allowable increases, and tenant protections in regulated units.',
+    category: 'financial',
+    type: 'guide',
+    content: 'Complete guide to rent control regulations, calculating legal increases, and challenging illegal rent hikes.'
+  },
+  {
+    id: '10',
+    title: 'Housing Code Violations',
+    description: 'How to report and document housing code violations, health hazards, and habitability issues.',
+    category: 'legal',
+    type: 'guide',
+    content: 'Step-by-step guide to identifying, documenting, and reporting housing code violations to authorities.'
+  },
+  {
+    id: '11',
+    title: 'Disability Rights in Housing',
+    description: 'Reasonable accommodations, accessibility requirements, and disability rights in rental housing.',
+    category: 'rights',
+    type: 'guide',
+    content: 'Understanding your rights to reasonable accommodations, service animals, and accessible housing modifications.'
+  },
+  {
+    id: '12',
+    title: 'Tenant Union Resources',
+    description: 'Find local tenant unions, organize with other renters, and collective bargaining information.',
+    category: 'rights',
+    type: 'external',
+    link: 'https://www.tenantstogether.org'
   }
 ];
 
 const categories = [
-  { id: 'all', label: 'All Resources', icon: 'fileText' as const },
-  { id: 'legal', label: 'Legal Help', icon: 'scale' as const },
-  { id: 'financial', label: 'Financial', icon: 'dollarSign' as const },
-  { id: 'rights', label: 'Tenant Rights', icon: 'shield' as const },
-  { id: 'emergency', label: 'Emergency', icon: 'alertTriangle' as const }
+  { id: 'all', label: 'All Resources', icon: 'fileText' as const, count: 0 },
+  { id: 'legal', label: 'Legal Help', icon: 'shield' as const, count: 0 },
+  { id: 'financial', label: 'Financial', icon: 'dollarSign' as const, count: 0 },
+  { id: 'rights', label: 'Tenant Rights', icon: 'user' as const, count: 0 },
+  { id: 'emergency', label: 'Emergency', icon: 'alertTriangle' as const, count: 0 }
 ];
 
 export default function ResourcesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filteredResources, setFilteredResources] = useState<Resource[]>(resources);
 
-  const filteredResources = selectedCategory === 'all' 
-    ? resources 
-    : resources.filter(resource => resource.category === selectedCategory);
+  // Phase 1: Enhanced filtering and search
+  useEffect(() => {
+    let filtered = selectedCategory === 'all' 
+      ? resources 
+      : resources.filter(resource => resource.category === selectedCategory);
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(resource => 
+        resource.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        resource.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (resource.content && resource.content.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+
+    setFilteredResources(filtered);
+  }, [selectedCategory, searchQuery]);
+
+  // Update category counts
+  const categoriesWithCounts = categories.map(category => ({
+    ...category,
+    count: category.id === 'all' 
+      ? resources.length 
+      : resources.filter(r => r.category === category.id).length
+  }));
 
   const getCategoryIcon = (iconName: string) => {
     const iconMap = {
@@ -105,6 +163,7 @@ export default function ResourcesPage() {
       scale: Icons.shield,
       dollarSign: Icons.dollarSign,
       shield: Icons.shield,
+      user: Icons.user,
       alertTriangle: Icons.alertTriangle
     };
     return iconMap[iconName as keyof typeof iconMap] || Icons.fileText;
@@ -136,10 +195,67 @@ export default function ResourcesPage() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Tenant Resources</h1>
-            <p className="text-xl text-gray-600">
-              Essential tools, guides, and contacts to protect your rights as a tenant
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Tenant Resources</h1>
+                <p className="text-gray-600">
+                  Essential tools, guides, and contacts to protect your rights as a tenant
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="bg-blue-50 px-3 py-2 rounded-lg">
+                  <span className="text-sm font-medium text-blue-700">
+                    {resources.length} Resources Available
+                  </span>
+                </div>
+                <Button asChild>
+                  <Link href="/dashboard">
+                    <Icons.fileText className="h-4 w-4 mr-2" />
+                    View Dashboard
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            {/* Phase 1: Enhanced Search and Filter Controls */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
+              <div className="flex flex-col lg:flex-row gap-4">
+                {/* Search */}
+                <div className="flex-1">
+                  <div className="relative">
+                    <Icons.search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search resources by title, description, or content..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Clear Search */}
+                {searchQuery && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setSearchQuery('')}
+                    className="whitespace-nowrap"
+                  >
+                    <Icons.x className="h-4 w-4 mr-2" />
+                    Clear Search
+                  </Button>
+                )}
+              </div>
+
+              {/* Results Summary */}
+              {searchQuery && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    Showing {filteredResources.length} of {resources.length} resources matching &ldquo;{searchQuery}&rdquo;
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Emergency Banner */}
@@ -170,20 +286,43 @@ export default function ResourcesPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {categories.map((category) => {
+                  {categoriesWithCounts.map((category) => {
                     const IconComponent = getCategoryIcon(category.icon);
                     return (
                       <button
                         key={category.id}
                         onClick={() => setSelectedCategory(category.id)}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                        className={cn(
+                          "w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all duration-200 group",
                           selectedCategory === category.id
-                            ? 'bg-blue-100 text-blue-900'
-                            : 'hover:bg-gray-100'
-                        }`}
+                            ? 'bg-blue-100 text-blue-900 shadow-sm border border-blue-200'
+                            : 'hover:bg-gray-50 hover:shadow-sm border border-transparent'
+                        )}
                       >
-                        <IconComponent className="h-4 w-4" />
-                        <span className="font-medium">{category.label}</span>
+                        <div className="flex items-center space-x-3">
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+                            selectedCategory === category.id
+                              ? 'bg-blue-200'
+                              : 'bg-gray-100 group-hover:bg-gray-200'
+                          )}>
+                            <IconComponent className={cn(
+                              "h-4 w-4",
+                              selectedCategory === category.id
+                                ? 'text-blue-700'
+                                : 'text-gray-600'
+                            )} />
+                          </div>
+                          <span className="font-medium">{category.label}</span>
+                        </div>
+                        <span className={cn(
+                          "text-sm font-medium px-2 py-1 rounded-full",
+                          selectedCategory === category.id
+                            ? 'bg-blue-200 text-blue-800'
+                            : 'bg-gray-200 text-gray-600 group-hover:bg-gray-300'
+                        )}>
+                          {category.count}
+                        </span>
                       </button>
                     );
                   })}
@@ -225,77 +364,110 @@ export default function ResourcesPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredResources.map((resource) => {
-                  const TypeIcon = getTypeIcon(resource.type);
-                  return (
-                    <Card key={resource.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getCategoryColor(resource.category)}`}>
-                              <TypeIcon className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <CardTitle className="text-lg">{resource.title}</CardTitle>
-                              <div className="flex items-center space-x-2 mt-1">
-                                <span className={`px-2 py-1 text-xs rounded-full ${getCategoryColor(resource.category)}`}>
-                                  {resource.category}
-                                </span>
-                                <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                                  {resource.type}
-                                </span>
+              {filteredResources.length === 0 ? (
+                <div className="col-span-full text-center py-12">
+                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Icons.search className="h-10 w-10 text-gray-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    No resources found
+                  </h3>
+                  <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                    {searchQuery 
+                      ? `No resources match your search for "${searchQuery}"` 
+                      : `No resources available in the ${categoriesWithCounts.find(cat => cat.id === selectedCategory)?.label} category`
+                    }
+                  </p>
+                  <div className="flex gap-2 justify-center">
+                    {searchQuery && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setSearchQuery('')}
+                      >
+                        Clear Search
+                      </Button>
+                    )}
+                    <Button 
+                      onClick={() => {
+                        setSelectedCategory('all');
+                        setSearchQuery('');
+                      }}
+                    >
+                      View All Resources
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {filteredResources.map((resource) => {
+                    const TypeIcon = getTypeIcon(resource.type);
+                    return (
+                      <Card key={resource.id} className="group hover:shadow-xl hover:border-blue-300 transition-all duration-200 cursor-pointer bg-white">
+                        <CardHeader className="pb-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4">
+                              <div className={cn(
+                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-110",
+                                getCategoryColor(resource.category)
+                              )}>
+                                <TypeIcon className="h-6 w-6" />
+                              </div>
+                              <div className="flex-1">
+                                <CardTitle className="text-lg group-hover:text-blue-900 transition-colors">
+                                  {resource.title}
+                                </CardTitle>
+                                <div className="flex items-center space-x-2 mt-2">
+                                  <span className={cn(
+                                    "px-3 py-1 text-xs font-medium rounded-full capitalize",
+                                    getCategoryColor(resource.category)
+                                  )}>
+                                    {resource.category.replace('-', ' ')}
+                                  </span>
+                                  <span className="px-3 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full capitalize">
+                                    {resource.type}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <CardDescription className="mb-4">
-                          {resource.description}
-                        </CardDescription>
-                        
-                        <div className="flex space-x-2">
-                          {resource.type === 'contact' && resource.phone && (
-                            <Button className="flex-1">
-                              <Icons.phone className="h-4 w-4 mr-2" />
-                              Call {resource.phone}
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <CardDescription className="mb-6 text-gray-600 leading-relaxed">
+                            {resource.description}
+                          </CardDescription>
+                          
+                          <div className="flex gap-3">
+                            {resource.type === 'contact' && resource.phone && (
+                              <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
+                                <Icons.phone className="h-4 w-4 mr-2" />
+                                Call {resource.phone}
+                              </Button>
+                            )}
+                            {resource.type === 'external' && resource.link && (
+                              <Button className="flex-1 bg-blue-600 hover:bg-blue-700" asChild>
+                                <a href={resource.link} target="_blank" rel="noopener noreferrer">
+                                  <Icons.externalLink className="h-4 w-4 mr-2" />
+                                  Visit Website
+                                </a>
+                              </Button>
+                            )}
+                            {resource.type === 'guide' && (
+                              <Button asChild className="flex-1 bg-blue-600 hover:bg-blue-700">
+                                <Link href={`/resources/${resource.id}`}>
+                                  <Icons.bookOpen className="h-4 w-4 mr-2" />
+                                  Read Guide
+                                </Link>
+                              </Button>
+                            )}
+                            <Button variant="outline" size="sm" className="hover:bg-gray-50">
+                              <Icons.bookmark className="h-4 w-4 mr-1" />
+                              Save
                             </Button>
-                          )}
-                          {resource.type === 'external' && resource.link && (
-                            <Button className="flex-1" asChild>
-                              <a href={resource.link} target="_blank" rel="noopener noreferrer">
-                                <Icons.externalLink className="h-4 w-4 mr-2" />
-                                Visit Website
-                              </a>
-                            </Button>
-                          )}
-                          {resource.type === 'guide' && (
-                            <Button asChild className="flex-1">
-                              <Link href={`/resources/${resource.id}`}>
-                                <Icons.bookOpen className="h-4 w-4 mr-2" />
-                                Read Guide
-                              </Link>
-                            </Button>
-                          )}
-                          <Button variant="outline" size="sm">
-                            <Icons.bookmark className="h-4 w-4 mr-1" />
-                            Save
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-
-              {filteredResources.length === 0 && (
-                <div className="text-center py-12">
-                  <Icons.search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No resources found</h3>
-                  <p className="text-gray-600">
-                    Try selecting a different category or check back later for more resources
-                  </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </div>

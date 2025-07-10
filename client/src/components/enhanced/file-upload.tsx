@@ -307,7 +307,7 @@ function EnhancedFileUpload({
               <p className="text-red-800 font-medium">{error || validationError}</p>
               {validationError && (
                 <p className="text-red-600 text-sm mt-1">
-                  Please select a valid PDF file and try again.
+                  File &ldquo;{selectedFile.name}&rdquo; selected successfully! Please select a valid PDF file and try again.
                 </p>
               )}
             </div>
@@ -325,7 +325,7 @@ function EnhancedFileUpload({
               </svg>
             </div>
             <p className="text-green-800 font-medium">
-              File ready for analysis! Click "Analyze My Lease" to continue.
+              File ready for analysis! Click &ldquo;Analyze My Lease&rdquo; to continue.
             </p>
           </div>
         </div>
